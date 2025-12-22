@@ -1,0 +1,30 @@
+{
+  "name": "nav",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:cf": "wrangler dev",
+    "build": "vite build",
+    "preview": "$npm_execpath run build && vite preview",
+    "deploy": "$npm_execpath run build && wrangler deploy",
+    "cf-typegen": "wrangler types --env-interface CloudflareBindings",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate:local": "wrangler d1 migrations apply NAV --local",
+    "db:migrate:remote": "wrangler d1 migrations apply NAV --remote"
+  },
+  "dependencies": {
+    "@types/node": "^25.0.3",
+    "dayjs": "^1.11.19",
+    "dotenv": "^17.2.3",
+    "drizzle-orm": "^0.45.1",
+    "hono": "^4.11.1"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.2.3",
+    "drizzle-kit": "^0.31.8",
+    "tsx": "^4.21.0",
+    "vite": "^6.3.5",
+    "vite-ssr-components": "^0.5.1",
+    "wrangler": "^4.17.0"
+  }
+}

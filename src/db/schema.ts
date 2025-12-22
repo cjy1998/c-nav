@@ -1,0 +1,39 @@
+import { int, sqliteTable, text } from "drizzle-orm/sqlite-core";
+
+export const settingsTable = sqliteTable("settings", {
+  id: int().primaryKey({ autoIncrement: true }),
+  key: text().notNull(),
+  value: text().notNull(),
+  remark: text(),
+  createdAt: text().notNull(),
+  updatedAt: text().notNull(),
+  deletedAt: text(),
+});
+export const categorysTable = sqliteTable("categorys", {
+  id: int().primaryKey({ autoIncrement: true }),
+  name: text().notNull(),
+  index: int().notNull().default(0),
+  parentId: int().default(0),
+  depth: int().notNull().default(0),
+  isPrivate: int().notNull().default(0),
+  createdAt: text().notNull(),
+  updatedAt: text().notNull(),
+  deletedAt: text(),
+});
+export const bookmarkTable = sqliteTable("bookmarks", {
+  id: int().primaryKey({ autoIncrement: true }),
+  name: text().notNull(),
+  url: text().notNull(),
+  desc: text().default(""),
+  icon: text().default(""),
+  categoryId: int().default(0),
+  index: int().notNull().default(0),
+  tags: text().default(""),
+  note: text().default(""),
+  isPrivate: int().notNull().default(0),
+  createdAt: text().notNull(),
+  updatedAt: text().notNull(),
+  deletedAt: text(),
+});
+
+export type Settings = typeof settingsTable.$inferInsert;
