@@ -16,8 +16,5 @@
 			"binding": "NAV_KV",
 			"id": "8a33c3aba2b94f648f99d46dd7f25a99"
 		}
-	],
-	"vars": {
-		"JWT_SECRET": "ksdjksfe3ovgvvkov09wehh"
-	}
+	]
 }
