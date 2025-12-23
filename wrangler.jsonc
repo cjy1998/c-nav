@@ -16,5 +16,13 @@
 			"binding": "NAV_KV",
 			"id": "8a33c3aba2b94f648f99d46dd7f25a99"
 		}
-	]
+	],
+	"observability": {
+		"logs": {
+			"enabled": false,
+			"head_sampling_rate": 1,
+			"invocation_logs": true,
+			"persist": true
+		}
+	}
 }
