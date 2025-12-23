@@ -1,6 +1,10 @@
 import { int, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { now } from "../utils";
-
+import {
+  createInsertSchema,
+  createSelectSchema,
+  createUpdateSchema,
+} from "drizzle-zod";
 export const settingsTable = sqliteTable("settings", {
   id: int().primaryKey({ autoIncrement: true }),
   key: text().notNull(),
@@ -14,6 +18,13 @@ export const settingsTable = sqliteTable("settings", {
     .$onUpdateFn(() => now()),
   deletedAt: text(),
 });
+/**
+ * zod Schema（运行时验证器） ，由 drizzle-zod 库根据数据库表结构自动生成。
+ */
+export const settingsSelectSchema = createSelectSchema(settingsTable);
+export const settingsInsertSchema = createInsertSchema(settingsTable);
+export const settingsUpdateSchema = createUpdateSchema(settingsTable);
+
 export const categorysTable = sqliteTable("categorys", {
   id: int().primaryKey({ autoIncrement: true }),
   name: text().notNull(),
@@ -40,5 +51,3 @@ export const bookmarkTable = sqliteTable("bookmarks", {
   updatedAt: text().notNull(),
   deletedAt: text(),
 });
-
-export type Settings = typeof settingsTable.$inferInsert;

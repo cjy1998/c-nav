@@ -42,3 +42,7 @@ https://developers.cloudflare.com/workers/development-testing/local-data/
         ```
 
         [更多命令](https://developers.cloudflare.com/workers/wrangler/commands/#d1)
+
+## zod
+
+![image.png](https://imgbed.cj.abrdns.com/file/1766461039945_image.png)

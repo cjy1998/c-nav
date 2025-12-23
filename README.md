@@ -27,3 +27,5 @@ Common commands for managing the D1 database with Drizzle ORM:
 - `npm run db:generate`: Generate SQL migration files based on schema changes.
 - `npm run db:migrate:local`: Apply migrations to the local D1 database.
 - `npm run db:migrate:remote`: Apply migrations to the remote Cloudflare D1 database.
+
+![image.png](https://imgbed.cj.abrdns.com/file/1766461039945_image.png)

@@ -1,7 +1,8 @@
 import { sql } from "drizzle-orm";
 import { createDb } from "../db/client";
-import { Settings, settingsTable } from "../db/schema";
+import { settingsTable } from "../db/schema";
 import { now } from "../utils";
+import { SettingsInsertType, SettingsUpdateType } from "../db/type";
 
 export async function getSettings(env: Env) {
   const db = createDb(env.NAV);
@@ -12,24 +13,26 @@ export async function getSettings(env: Env) {
   return result;
 }
 
-export async function createSettings(env: Env, settings: Settings) {
+export async function createSettings(env: Env, settings: SettingsInsertType) {
   const db = createDb(env.NAV);
-  const { results, success } = await db.insert(settingsTable).values(settings);
-  return results;
+  const result = await db.insert(settingsTable).values(settings).returning();
+  return result[0];
 }
 
-export async function updateSettings(env: Env, id: number, settings: Settings) {
+export async function updateSettings(
+  env: Env,
+  id: number,
+  settings: SettingsUpdateType
+) {
   const db = createDb(env.NAV);
-  // settings.updatedAt = now();
-  console.log(now());
-
   const result = await db
     .update(settingsTable)
     .set(settings)
     .where(
       sql`${settingsTable.id} = ${id} and ${settingsTable.deletedAt} is null`
-    );
-  return result;
+    )
+    .returning();
+  return result[0];
 }
 
 export async function deleteSettings(env: Env, id: number) {
@@ -39,11 +42,12 @@ export async function deleteSettings(env: Env, id: number) {
     .from(settingsTable)
     .where(sql`${settingsTable.id} = ${id}`);
   if (data.length === 0) {
-    throw new Error("Settings not found");
+    throw new Error("该条目不存在");
   }
   const result = await db
     .update(settingsTable)
-    .set({ deletedAt: new Date().toISOString() })
-    .where(sql`${settingsTable.id} = ${id}`);
-  return result;
+    .set({ deletedAt: now() })
+    .where(sql`${settingsTable.id} = ${id}`)
+    .returning();
+  return result[0];
 }

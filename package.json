@@ -13,11 +13,14 @@
     "db:migrate:remote": "wrangler d1 migrations apply NAV --remote"
   },
   "dependencies": {
+    "@hono/zod-validator": "^0.7.6",
     "@types/node": "^25.0.3",
     "dayjs": "^1.11.19",
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.45.1",
-    "hono": "^4.11.1"
+    "drizzle-zod": "^0.8.3",
+    "hono": "^4.11.1",
+    "zod": "^4.2.1"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.2.3",
