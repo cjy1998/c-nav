@@ -1,12 +1,17 @@
 import { int, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { now } from "../utils";
 
 export const settingsTable = sqliteTable("settings", {
   id: int().primaryKey({ autoIncrement: true }),
   key: text().notNull(),
   value: text().notNull(),
   remark: text(),
-  createdAt: text().notNull(),
-  updatedAt: text().notNull(),
+  createdAt: text()
+    .notNull()
+    .$defaultFn(() => now()),
+  updatedAt: text()
+    .notNull()
+    .$onUpdateFn(() => now()),
   deletedAt: text(),
 });
 export const categorysTable = sqliteTable("categorys", {
