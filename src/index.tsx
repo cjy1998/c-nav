@@ -1,10 +1,11 @@
 import { Hono } from "hono";
 import settings from "./routes/settings";
+import auth from "./routes/auth";
 
 const app = new Hono();
 
 app.get("/status", (c) => c.text("OK"));
-
+app.route("/auth", auth);
 app.route("/settings", settings);
 
 // app.get("/kv", async (c) => {
