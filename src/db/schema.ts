@@ -32,10 +32,19 @@ export const categorysTable = sqliteTable("categorys", {
   parentId: int().default(0),
   depth: int().notNull().default(0),
   isPrivate: int().notNull().default(0),
-  createdAt: text().notNull(),
-  updatedAt: text().notNull(),
+  createdAt: text()
+    .notNull()
+    .$defaultFn(() => now()),
+  updatedAt: text()
+    .notNull()
+    .$onUpdateFn(() => now()),
   deletedAt: text(),
 });
+
+export const categorysSelectSchema = createSelectSchema(categorysTable);
+export const categorysInsertSchema = createInsertSchema(categorysTable);
+export const categorysUpdateSchema = createUpdateSchema(categorysTable);
+
 export const bookmarkTable = sqliteTable("bookmarks", {
   id: int().primaryKey({ autoIncrement: true }),
   name: text().notNull(),
@@ -47,7 +56,15 @@ export const bookmarkTable = sqliteTable("bookmarks", {
   tags: text().default(""),
   note: text().default(""),
   isPrivate: int().notNull().default(0),
-  createdAt: text().notNull(),
-  updatedAt: text().notNull(),
+  createdAt: text()
+    .notNull()
+    .$defaultFn(() => now()),
+  updatedAt: text()
+    .notNull()
+    .$onUpdateFn(() => now()),
   deletedAt: text(),
 });
+
+export const bookmarkSelectSchema = createSelectSchema(bookmarkTable);
+export const bookmarkInsertSchema = createInsertSchema(bookmarkTable);
+export const bookmarkUpdateSchema = createUpdateSchema(bookmarkTable);

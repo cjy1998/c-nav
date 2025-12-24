@@ -1,13 +1,16 @@
 import { Hono } from "hono";
 import settings from "./routes/settings";
 import auth from "./routes/auth";
+import categorys from "./routes/categorys";
+import bookmarks from "./routes/bookmark";
 
 const app = new Hono();
 
 app.get("/status", (c) => c.text("OK"));
 app.route("/auth", auth);
 app.route("/settings", settings);
-
+app.route("/categorys", categorys);
+app.route("/bookmarks", bookmarks);
 // app.get("/kv", async (c) => {
 //   const result = await c.env.NAV_KV.get("key");
 //   return c.text(result || "");
