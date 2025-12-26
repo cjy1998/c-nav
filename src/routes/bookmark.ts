@@ -10,11 +10,13 @@ import { bookmarkInsertSchema, bookmarkUpdateSchema } from "../db/schema";
 import { ResponseUtil } from "../utils/response";
 import { zValidator } from "@hono/zod-validator";
 import { authMiddleware } from "../middleware/authMiddleware";
+import { BookmarkQueryType } from "../db/type";
 const bookmarks = new Hono<{ Bindings: Bindings }>();
 
-bookmarks.get("/", async (c) => {
+bookmarks.get("/", zValidator("query", BookmarkQueryType), async (c) => {
   try {
-    const result = await getBookmarks(c.env);
+    const query = c.req.valid("query");
+    const result = await getBookmarks(c.env, query);
     return c.json(ResponseUtil.success(result));
   } catch (error: any) {
     return c.json(ResponseUtil.serverError(error.message));

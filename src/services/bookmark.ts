@@ -2,14 +2,30 @@ import { sql } from "drizzle-orm";
 import { createDb } from "../db/client";
 import { bookmarkTable } from "../db/schema";
 import { now } from "../utils";
-import { BookmarkInsertType, BookmarkUpdateType } from "../db/type";
+import {
+  BookmarkInsertType,
+  BookmarkQueryType,
+  BookmarkUpdateType,
+} from "../db/type";
+import z from "zod";
 
-export async function getBookmarks(env: Env) {
+export async function getBookmarks(
+  env: Env,
+  query: z.infer<typeof BookmarkQueryType>
+) {
   const db = createDb(env.NAV);
-  const result = await db
-    .select()
-    .from(bookmarkTable)
-    .where(sql`${bookmarkTable.deletedAt} is null`);
+  console.log("query......", query);
+  const where = sql`${bookmarkTable.deletedAt} is null`;
+  if (query.categoryId) {
+    where.append(sql` and ${bookmarkTable.categoryId} = ${query.categoryId}`);
+  }
+  if (query.name) {
+    console.log("query.name......", query.name);
+    // where.append(sql` and ${bookmarkTable.name} like %${query.name}%`);
+    where.append(sql` and ${bookmarkTable.name} like ${`%${query.name}%`}`);
+    console.log("where......", where);
+  }
+  const result = await db.select().from(bookmarkTable).where(where);
   return result;
 }
 

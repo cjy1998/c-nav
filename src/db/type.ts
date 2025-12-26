@@ -1,6 +1,7 @@
 import z from "zod";
 import {
   bookmarkInsertSchema,
+  bookmarkSelectSchema,
   bookmarkUpdateSchema,
   categorysInsertSchema,
   categorysUpdateSchema,
@@ -16,3 +17,7 @@ export type CategorysUpdateType = z.infer<typeof categorysUpdateSchema>;
 
 export type BookmarkInsertType = z.infer<typeof bookmarkInsertSchema>;
 export type BookmarkUpdateType = z.infer<typeof bookmarkUpdateSchema>;
+export const BookmarkQueryType = z.object({
+  name: z.string().optional(),
+  categoryId: z.string().optional(),
+});
