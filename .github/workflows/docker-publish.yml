@@ -1,0 +1,131 @@
+name: Build & Deploy
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: "构建成功后自动部署到服务器"
+        type: boolean
+        default: true
+
+concurrency:
+  group: c-nav-release
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ccr.ccs.tencentyun.com
+  NAMESPACE: cnav
+  IMAGE: c-nav
+
+jobs:
+  build:
+    name: Build & push image
+    runs-on: ubuntu-latest
+    outputs:
+      short_sha: ${{ steps.meta.outputs.short_sha }}
+      tags: ${{ steps.meta.outputs.tags }}
+      digest: ${{ steps.push.outputs.digest }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute tags
+        id: meta
+        shell: bash
+        run: |
+          short_sha="${GITHUB_SHA::7}"
+          image="${REGISTRY}/${NAMESPACE}/${IMAGE}"
+          {
+            echo "image=${image}"
+            echo "short_sha=${short_sha}"
+            echo "tags=${image}:latest,${image}:sha-${short_sha}"
+          } >> "$GITHUB_OUTPUT"
+          echo "将推送: ${image}:latest  ${image}:sha-${short_sha}"
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Tencent TCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.TCR_USERNAME }}
+          password: ${{ secrets.TCR_PASSWORD }}
+
+      - name: Build and push
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.meta.outputs.short_sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # GitHub runner 在境外，推到腾讯云公网偶尔会被限速/断流，失败时用缓存重试一次
+      - name: Retry push once
+        if: failure()
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### 镜像"
+            echo '```'
+            tr ',' '\n' <<< "${{ steps.meta.outputs.tags }}"
+            echo '```'
+            echo "digest: \`${{ steps.push.outputs.digest }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    name: Deploy to server
+    needs: build
+    if: github.event_name == 'push' || github.event.inputs.deploy == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH deploy
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || '22' }}
+          command_timeout: 20m
+          envs: IMAGE_TAG,DEPLOY_DIR
+          env: |
+            IMAGE_TAG=sha-${{ needs.build.outputs.short_sha }}
+            DEPLOY_DIR=/opt/c-nav
+          script: |
+            set -eu
+            cd "$DEPLOY_DIR"
+            touch .env
+            if grep -q '^IMAGE_TAG=' .env; then
+              sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=${IMAGE_TAG}|" .env
+            else
+              echo "IMAGE_TAG=${IMAGE_TAG}" >> .env
+            fi
+            docker compose pull
+            docker compose up -d --remove-orphans
+            sleep 5
+            docker compose ps
+            PORT=$(sed -n 's/^APP_PORT=//p' .env | tail -1)
+            curl -fsS --retry 12 --retry-delay 3 --retry-connrefused \
+              "http://127.0.0.1:${PORT:-3000}/api/health"
+            echo "deployed ${IMAGE_TAG}"
