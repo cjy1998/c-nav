@@ -1,0 +1,7 @@
+node_modules/
+dist/
+data/*.db*
+storage/icons/*
+storage/wallpapers/*
+.env
+.DS_Store
