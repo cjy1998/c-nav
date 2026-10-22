@@ -24,6 +24,7 @@ export function Manage({ data, refresh, notify, onHome, onLogout }: Props) {
   const [bookmarkModal, setBookmarkModal] = useState<{ bookmark?: Bookmark; categoryId?: string } | null>(null)
   const [categoryModal, setCategoryModal] = useState<Category | 'new' | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [passwordOpen, setPasswordOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [dragBookmark, setDragBookmark] = useState<string | null>(null)
   const [dragCategory, setDragCategory] = useState<string | null>(null)
@@ -128,7 +129,8 @@ export function Manage({ data, refresh, notify, onHome, onLogout }: Props) {
 
     {bookmarkModal && <BookmarkDialog data={data} initial={bookmarkModal} onClose={() => setBookmarkModal(null)} onSaved={async (message) => { setBookmarkModal(null); await refresh(); notify(message) }} />}
     {categoryModal && <CategoryDialog initial={categoryModal} onClose={() => setCategoryModal(null)} onSaved={async (message) => { setCategoryModal(null); await refresh(); notify(message) }} />}
-    {settingsOpen && <SettingsDialog settings={data.settings} onClose={() => setSettingsOpen(false)} onSaved={async () => { setSettingsOpen(false); await refresh(); notify('设置已保存') }} />}
+    {settingsOpen && <SettingsDialog settings={data.settings} onChangePassword={() => setPasswordOpen(true)} onClose={() => setSettingsOpen(false)} onSaved={async () => { setSettingsOpen(false); await refresh(); notify('设置已保存') }} />}
+    {passwordOpen && <PasswordDialog onClose={() => setPasswordOpen(false)} onSaved={() => { setPasswordOpen(false); notify('密码已修改，其他设备需重新登录') }} />}
     {importOpen && <ImportDialog onClose={() => setImportOpen(false)} onDone={async (message) => { setImportOpen(false); await refresh(); notify(message) }} />}
   </div>
 }
@@ -191,15 +193,38 @@ function CategoryDialog({ initial, onClose, onSaved }: { initial: Category | 'ne
   return <Modal title={category ? '编辑分类' : '新建分类'} onClose={onClose} size="sm"><form onSubmit={(event) => void submit(event)}><div className="dlg-body"><label className="field"><span>名称</span><input className="input" value={name} onChange={(event) => setName(event.target.value)} autoFocus /></label><label className="switch-row"><span className="switch-text"><span className="switch-title"><Icon name="lock" />私密分类</span><small>未登录时完全隐藏，也无法搜索</small></span><input className="switch" type="checkbox" checked={visibility === 'private'} onChange={(event) => setVisibility(event.target.checked ? 'private' : 'public')} /></label>{error && <p className="err">{error}</p>}</div><div className="dlg-foot">{category && <button type="button" className="btn ghost-danger" onClick={() => void remove()}>删除分类</button>}<span className="spacer"/><button type="button" className="btn" onClick={onClose}>取消</button><button className="btn primary">保存</button></div></form></Modal>
 }
 
-function SettingsDialog({ settings, onClose, onSaved }: { settings: PublicSettings; onClose: () => void; onSaved: () => Promise<void> }) {
+function SettingsDialog({ settings, onClose, onSaved, onChangePassword }: { settings: PublicSettings; onClose: () => void; onSaved: () => Promise<void>; onChangePassword: () => void }) {
   const [draft, setDraft] = useState(settings)
   const [error, setError] = useState('')
   async function submit(event: FormEvent) { event.preventDefault(); try { await api.updateSettings(draft); await onSaved() } catch (reason) { setError((reason as Error).message) } }
   return <Modal title="设置" onClose={onClose} size="lg"><form onSubmit={(event) => void submit(event)}><div className="dlg-body settings">
     <section className="set-sec"><h3>外观</h3><div className="set-row"><span><b>主题</b><small>可跟随系统自动切换</small></span><div className="seg">{(['light', 'dark', 'system'] as const).map((theme) => <button type="button" key={theme} aria-pressed={draft.theme === theme} onClick={() => setDraft({ ...draft, theme })}><Icon name={theme === 'light' ? 'sun' : theme === 'dark' ? 'moon' : 'monitor'} />{theme === 'light' ? '浅色' : theme === 'dark' ? '深色' : '系统'}</button>)}</div></div><div className="set-row"><span><b>首页壁纸</b><small>内置壁纸自动适配深浅主题</small></span><select className="input" value={draft.wallpaper} onChange={(event) => setDraft({ ...draft, wallpaper: event.target.value as PublicSettings['wallpaper'] })}><option value="dunes">沙丘</option><option value="hills">层峦</option><option value="gradient">渐变</option></select></div></section>
     <section className="set-sec"><h3>首页</h3><label className="set-row"><span><b>显示时钟</b><small>在首页搜索框上方显示时间</small></span><input className="switch" type="checkbox" checked={draft.showClock} onChange={(event) => setDraft({ ...draft, showClock: event.target.checked })} /></label><label className="set-row"><span><b>显示最近访问</b><small>访客首页只会展示公开书签</small></span><input className="switch" type="checkbox" checked={draft.showRecent} onChange={(event) => setDraft({ ...draft, showRecent: event.target.checked })} /></label><label className="set-row"><span><b>站点名称</b></span><input className="input" value={draft.siteName} onChange={(event) => setDraft({ ...draft, siteName: event.target.value })} /></label></section>
+    <section className="set-sec"><h3>安全</h3><div className="set-row"><span><b>管理密码</b><small>修改后其它设备上的登录会失效</small></span><button type="button" className="btn" onClick={onChangePassword}><Icon name="lock" size={16} />修改密码</button></div></section>
     <section className="set-sec soon"><h3>浏览器扩展</h3><div className="set-row"><span><b>快速收藏扩展</b><small>接口命名空间已经预留，第一版暂不启用</small></span><span className="badge">后续</span></div></section>{error && <p className="err">{error}</p>}
   </div><div className="dlg-foot"><span className="spacer"/><button type="button" className="btn" onClick={onClose}>取消</button><button className="btn primary">保存设置</button></div></form></Modal>
+}
+
+function PasswordDialog({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+  const [current, setCurrent] = useState('')
+  const [next, setNext] = useState('')
+  const [confirmText, setConfirmText] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  async function submit(event: FormEvent) {
+    event.preventDefault(); setError('')
+    if (next.length < 12) return setError('新密码至少 12 位')
+    if (next !== confirmText) return setError('两次输入的新密码不一致')
+    if (next === current) return setError('新密码不能与原密码相同')
+    setBusy(true)
+    try { await api.changePassword(current, next); onSaved() } catch (reason) { setError((reason as Error).message) } finally { setBusy(false) }
+  }
+  return <Modal title="修改密码" onClose={onClose} size="sm"><form onSubmit={(event) => void submit(event)}><div className="dlg-body">
+    <label className="field"><span>原密码</span><input className="input" type="password" value={current} onChange={(event) => setCurrent(event.target.value)} autoComplete="current-password" autoFocus /></label>
+    <label className="field"><span>新密码</span><input className="input" type="password" value={next} onChange={(event) => setNext(event.target.value)} autoComplete="new-password" /><small className="field-hint">至少 12 位</small></label>
+    <label className="field"><span>确认新密码</span><input className="input" type="password" value={confirmText} onChange={(event) => setConfirmText(event.target.value)} autoComplete="new-password" /></label>
+    {error && <p className="err">{error}</p>}
+  </div><div className="dlg-foot"><span className="spacer"/><button type="button" className="btn" onClick={onClose}>取消</button><button className="btn primary" disabled={busy}>{busy ? '修改中…' : '确认修改'}</button></div></form></Modal>
 }
 
 function ImportDialog({ onClose, onDone }: { onClose: () => void; onDone: (message: string) => Promise<void> }) {

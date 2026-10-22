@@ -7,7 +7,7 @@ import { bodyLimit } from 'hono/body-limit'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { z } from 'zod'
 import * as cheerio from 'cheerio'
-import { clearSessionCookie, currentAdminId, login, logout, requireAuth, sessionToken, setSessionCookie } from './auth.js'
+import { changePassword, clearSessionCookie, currentAdminId, login, logout, requireAuth, revokeOtherSessions, sessionToken, setSessionCookie } from './auth.js'
 import { db, getSettings, listBookmarks, listCategories, makePinyin, mapBookmark, normalizeUrl, setSettings } from './db.js'
 import { fetchMetadata } from './metadata.js'
 import type { Bookmark, PublicSettings } from '../../shared/types.js'
@@ -83,6 +83,19 @@ app.post('/api/auth/logout', (c) => {
 })
 
 app.get('/api/auth/me', (c) => c.json({ authenticated: Boolean(currentAdminId(c)) }))
+
+app.post('/api/auth/password', requireAuth, async (c) => {
+  const input = await readJson(c, z.object({
+    currentPassword: z.string().min(1, '请输入原密码').max(200),
+    newPassword: z.string().min(12, '新密码至少 12 位').max(200),
+  }))
+  if (!input.ok) return c.json({ error: input.error }, 400)
+  if (input.data.currentPassword === input.data.newPassword) return c.json({ error: '新密码不能与原密码相同' }, 400)
+  const adminId = currentAdminId(c)!
+  if (!changePassword(adminId, input.data.currentPassword, input.data.newPassword)) return c.json({ error: '原密码不正确' }, 400)
+  revokeOtherSessions(adminId, sessionToken(c))
+  return c.json({ ok: true })
+})
 
 app.get('/api/bootstrap', (c) => {
   const authenticated = Boolean(currentAdminId(c))

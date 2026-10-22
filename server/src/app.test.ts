@@ -158,3 +158,29 @@ describe('导入导出', () => {
     expect(response.status).toBe(409)
   })
 })
+
+describe('修改密码', () => {
+  it('原密码错误被拒绝，修改成功后当前会话保留、新密码可登录', async () => {
+    const wrong = await request('/api/auth/password', 'POST', { currentPassword: 'not-the-password', newPassword: 'brand-new-password-123' })
+    expect(wrong.status).toBe(400)
+    expect((await wrong.json()).error).toBe('原密码不正确')
+
+    const short = await request('/api/auth/password', 'POST', { currentPassword: 'integration-test-password', newPassword: 'short' })
+    expect(short.status).toBe(400)
+
+    const same = await request('/api/auth/password', 'POST', { currentPassword: 'integration-test-password', newPassword: 'integration-test-password' })
+    expect(same.status).toBe(400)
+
+    const unauthorized = await request('/api/auth/password', 'POST', { currentPassword: 'integration-test-password', newPassword: 'brand-new-password-123' }, false)
+    expect(unauthorized.status).toBe(401)
+
+    const ok = await request('/api/auth/password', 'POST', { currentPassword: 'integration-test-password', newPassword: 'brand-new-password-123' })
+    expect(ok.status).toBe(200)
+    expect(await (await request('/api/auth/me')).json()).toEqual({ authenticated: true })
+
+    const oldLogin = await request('/api/auth/login', 'POST', { username: 'admin', password: 'integration-test-password' }, false)
+    expect(oldLogin.status).toBe(401)
+    const newLogin = await request('/api/auth/login', 'POST', { username: 'admin', password: 'brand-new-password-123' }, false)
+    expect(newLogin.status).toBe(200)
+  })
+})

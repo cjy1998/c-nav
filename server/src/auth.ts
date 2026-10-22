@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto'
 import type { Context, MiddlewareHandler } from 'hono'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
-import { db, verifyPassword } from './db.js'
+import { db, hashPassword, verifyPassword } from './db.js'
 
 const COOKIE_NAME = 'nav_session'
 const sessionDays = Math.max(1, Number(process.env.SESSION_TTL_DAYS || 30))
@@ -23,6 +23,20 @@ export function login(username: string, password: string): string | null {
 
 export function logout(token: string | undefined) {
   if (token) db.prepare('DELETE FROM sessions WHERE token_hash = ?').run(tokenHash(token))
+}
+
+/** 校验原密码后更新为新密码；原密码不正确返回 false */
+export function changePassword(adminId: string, currentPassword: string, nextPassword: string): boolean {
+  const admin = db.prepare('SELECT password_hash FROM admins WHERE id = ?').get(adminId) as { password_hash: string } | undefined
+  if (!admin || !verifyPassword(currentPassword, admin.password_hash)) return false
+  db.prepare('UPDATE admins SET password_hash = ?, updated_at = ? WHERE id = ?').run(hashPassword(nextPassword), new Date().toISOString(), adminId)
+  return true
+}
+
+/** 修改密码后让其它设备上的登录失效，保留当前会话 */
+export function revokeOtherSessions(adminId: string, currentToken: string | undefined) {
+  if (currentToken) db.prepare('DELETE FROM sessions WHERE admin_id = ? AND token_hash <> ?').run(adminId, tokenHash(currentToken))
+  else db.prepare('DELETE FROM sessions WHERE admin_id = ?').run(adminId)
 }
 
 export function setSessionCookie(c: Context, token: string) {

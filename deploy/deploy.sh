@@ -19,11 +19,34 @@ DEPLOY_DIR="${DEPLOY_DIR:-/opt/c-nav}"
 SERVICE="${SERVICE:-navigation}"
 TAG="${1:-latest}"
 IMAGE="ccr.ccs.tencentyun.com/cnav/c-nav:${TAG}"
+REPO="${IMAGE%:*}"
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-90}"
+KEEP_VERSIONS="${KEEP_VERSIONS:-3}"
 
 say() { printf '\n\033[1;36m== %s ==\033[0m\n' "$*"; }
 warn() { printf '\033[1;33m[!] %s\033[0m\n' "$*"; }
 die() { printf '\033[1;31m[x] %s\033[0m\n' "$*" >&2; exit 1; }
+
+# 本地只保留最近 KEEP_VERSIONS 个版本（当前版本 + 若干个可回滚的旧版本）
+prune_old_images() {
+  local tag
+  local -a versions
+  mapfile -t versions < <(docker image ls --filter "reference=${REPO}:local-*" --format '{{.Tag}}' | sort -r)
+  if [ "${#versions[@]}" -le "$KEEP_VERSIONS" ]; then
+    echo "本地共 ${#versions[@]} 个版本，未超过 ${KEEP_VERSIONS} 个，无需清理"
+    return 0
+  fi
+  echo "本地共 ${#versions[@]} 个版本，保留最近 ${KEEP_VERSIONS} 个"
+  for tag in "${versions[@]:$KEEP_VERSIONS}"; do
+    if docker rmi "${REPO}:${tag}" >/dev/null 2>&1; then
+      echo "  已删除 ${tag}"
+    else
+      echo "  跳过 ${tag}（仍被容器引用，下次部署再清）"
+    fi
+  done
+  # 标签删掉后没有引用的旧镜像会变成悬空镜像，这里一并回收磁盘
+  docker image prune -f >/dev/null 2>&1 || true
+}
 
 say "准备"
 cd "$DEPLOY_DIR" 2>/dev/null || die "目录 $DEPLOY_DIR 不存在：先在服务器执行 setup-server.sh"
@@ -58,6 +81,11 @@ fi
 NEW_ID=$(docker image inspect "$IMAGE" --format '{{.Id}}' 2>/dev/null || true)
 [ -n "$NEW_ID" ] || die "拉取后仍找不到镜像 $IMAGE"
 
+# 给本次部署的镜像打一个带时间戳的本地标签：
+# 拉取 latest 后旧镜像会变成 <none>，只有打上 local-<时间> 才能按“版本”计数和回滚
+LOCAL_TAG="${REPO}:local-$(date +%Y%m%d-%H%M%S)"
+docker tag "$NEW_ID" "$LOCAL_TAG" >/dev/null 2>&1 || true
+
 say "更新容器"
 docker compose up -d --remove-orphans
 
@@ -91,6 +119,9 @@ if [ "$healthy" = "1" ]; then
   echo
   echo "访问地址: ${DOMAIN_HINT}"
   echo "本地探测: http://127.0.0.1:${APP_PORT}/api/health"
+  echo
+  echo "本地镜像:"
+  prune_old_images
   exit 0
 fi
 

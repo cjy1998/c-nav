@@ -79,6 +79,7 @@ bash /opt/c-nav/deploy.sh
 - 拉取 `cnav/c-nav:latest`，镜像没变就**不重启**
 - 等容器 `healthy`（最长 90 秒）
 - 失败自动**回滚**到上一版镜像，并打印日志
+- 成功启动后清理旧版本，本地只留最近 3 个（见第 7 节）
 
 ### 想全自动？把执行周期改成每 5 分钟
 
@@ -109,7 +110,24 @@ bash /opt/c-nav/deploy.sh sha-abcd1234   # 换成上一个 tag
 
 或临时改 `/opt/c-nav/.env` 里的 `IMAGE_TAG=sha-abcd1234` 再点一次「执行」。TCR 里的 `sha-*` tag 不可变，随时可回退。
 
-## 7. GitHub Secrets
+## 7. 镜像保留：仓库和服务器各留 3 个
+
+**服务器侧**由 `deploy.sh` 自动处理：每次部署给镜像打一个 `local-<时间戳>` 标签，启动成功后只保留最近 3 个版本（当前版 + 2 个可回滚的旧版），多余的标签连同悬空镜像一起删除。想改数量：
+
+```bash
+KEEP_VERSIONS=5 bash /opt/c-nav/deploy.sh    # 保留最近 5 个版本
+```
+
+**TCR 仓库侧**用控制台的一次性清理策略，不需要写脚本：
+
+1. [容器镜像服务控制台](https://console.cloud.tencent.com/tcr) → **实例管理** → 广州的个人版实例 → **更多 → 设置镜像清理**
+2. 勾选 **启用全局镜像生命周期管理**
+3. **保留最新镜像版本** 填 `6`（每次构建产生 `latest` + `sha-xxxxxxx` 两个标签，6 个标签 ≈ 最近 3 次构建）
+4. 确定
+
+之后每次推送后 TCR 会自动清掉更老的标签，`latest` 始终指向最新构建，仓库不会无限增长。
+
+## 8. GitHub Secrets
 
 只需要两个（部署相关的 `SSH_*` 已经不需要了，可以删掉）：
 
@@ -129,5 +147,5 @@ bash /opt/c-nav/deploy.sh sha-abcd1234   # 换成上一个 tag
 | `docker compose pull` 报 unauthorized | `docker login ccr.ccs.tencentyun.com -u 100006066898` 重新登录 |
 | 部署后 502 | `cd /opt/c-nav && docker compose logs --tail=50`；多为 `ADMIN_PASSWORD` 为空或被 Compose 拒绝 |
 | 登录后立刻掉线 | `APP_ORIGIN` 与浏览器地址不一致，或 `COOKIE_SECURE=true` 但走的是 http |
-| 管理员密码 | 仅首次初始化写入数据库，重设需删卷：`docker compose down -v`（会清空书签数据，慎用） |
+| 管理员密码 | 登录后 **设置 → 安全 → 修改密码**（需输入原密码）；忘记密码只能删卷重建：`docker compose down -v`（会清空书签数据，慎用） |
 | 计划任务里跑 `bash /opt/c-nav/deploy.sh` 报找不到 | 先确认 `setup-server.sh` 跑过；或直接改成 `cd /opt/c-nav && docker compose pull && docker compose up -d` |

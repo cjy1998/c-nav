@@ -16,6 +16,7 @@ export const api = {
   bootstrap: () => request<BootstrapData>('/api/bootstrap'),
   login: (username: string, password: string) => request<{ ok: true }>('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
   logout: () => request<{ ok: true }>('/api/auth/logout', { method: 'POST' }),
+  changePassword: (currentPassword: string, newPassword: string) => request<{ ok: true }>('/api/auth/password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) }),
   visit: (id: string) => request<{ ok: true }>(`/api/bookmarks/${id}/visit`, { method: 'POST' }),
   createCategory: (data: CategoryInput) => request('/api/admin/categories', { method: 'POST', body: JSON.stringify(data) }),
   updateCategory: (id: string, data: CategoryInput) => request(`/api/admin/categories/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
