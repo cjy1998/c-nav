@@ -127,6 +127,12 @@ KEEP_VERSIONS=5 bash /opt/c-nav/deploy.sh    # 保留最近 5 个版本
 
 之后每次推送后 TCR 会自动清掉更老的标签，`latest` 始终指向最新构建，仓库不会无限增长。
 
+`deploy.sh` 只在首次跑 `setup-server.sh` 时安装，之后升级它用这一行（不会动 `.env` 和容器）：
+
+```bash
+curl -fsSL https://cdn.jsdelivr.net/gh/cjy1998/c-nav@main/deploy/deploy.sh -o /opt/c-nav/deploy.sh && chmod 755 /opt/c-nav/deploy.sh
+```
+
 ## 8. GitHub Secrets
 
 只需要两个（部署相关的 `SSH_*` 已经不需要了，可以删掉）：
