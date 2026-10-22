@@ -1,15 +1,14 @@
-name: Build & Deploy
+name: Build & Push Image
+
+# 只负责构建并推送镜像到腾讯云 TCR。
+# 部署由服务器本机完成（1Panel 计划任务执行 deploy/deploy.sh），
+# 不需要从 GitHub 反连服务器，避免境外 runner 的 IP 被安全策略拦截。
 
 on:
   push:
     tags:
       - "v*"
   workflow_dispatch:
-    inputs:
-      deploy:
-        description: "构建成功后自动部署到服务器"
-        type: boolean
-        default: true
 
 concurrency:
   group: c-nav-release
@@ -24,10 +23,6 @@ jobs:
   build:
     name: Build & push image
     runs-on: ubuntu-latest
-    outputs:
-      short_sha: ${{ steps.meta.outputs.short_sha }}
-      tags: ${{ steps.meta.outputs.tags }}
-      digest: ${{ steps.push.outputs.digest }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -70,7 +65,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # GitHub runner 在境外，推到腾讯云公网偶尔会被限速/断流，失败时用缓存重试一次
+      # runner 在境外，推到腾讯云偶尔会被限速/断流；失败时用缓存整体重试一次
       - name: Retry push once
         if: failure()
         uses: docker/build-push-action@v6
@@ -92,40 +87,6 @@ jobs:
             tr ',' '\n' <<< "${{ steps.meta.outputs.tags }}"
             echo '```'
             echo "digest: \`${{ steps.push.outputs.digest }}\`"
+            echo
+            echo "**下一步**：在服务器 1Panel → 计划任务 → 点「执行」拉取新镜像上线。"
           } >> "$GITHUB_STEP_SUMMARY"
-
-  deploy:
-    name: Deploy to server
-    needs: build
-    if: github.event_name == 'push' || github.event.inputs.deploy == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: SSH deploy
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.SSH_PORT || '22' }}
-          command_timeout: 20m
-          envs: IMAGE_TAG,DEPLOY_DIR
-          env: |
-            IMAGE_TAG=sha-${{ needs.build.outputs.short_sha }}
-            DEPLOY_DIR=/opt/c-nav
-          script: |
-            set -eu
-            cd "$DEPLOY_DIR"
-            touch .env
-            if grep -q '^IMAGE_TAG=' .env; then
-              sed -i "s|^IMAGE_TAG=.*|IMAGE_TAG=${IMAGE_TAG}|" .env
-            else
-              echo "IMAGE_TAG=${IMAGE_TAG}" >> .env
-            fi
-            docker compose pull
-            docker compose up -d --remove-orphans
-            sleep 5
-            docker compose ps
-            PORT=$(sed -n 's/^APP_PORT=//p' .env | tail -1)
-            curl -fsS --retry 12 --retry-delay 3 --retry-connrefused \
-              "http://127.0.0.1:${PORT:-3000}/api/health"
-            echo "deployed ${IMAGE_TAG}"

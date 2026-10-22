@@ -2,7 +2,7 @@
 # c-nav 服务器一次性初始化（在宿主机 root 下执行，1Panel 终端 / SSH 均可）
 #   bash setup-server.sh
 # 可覆盖的环境变量：
-#   DEPLOY_DIR=/opt/c-nav  DOMAIN=nav.deepthinkspace.cn  APP_PORT=3000  SSH_USER=root
+#   DEPLOY_DIR=/opt/c-nav  DOMAIN=nav.deepthinkspace.cn  APP_PORT=3000
 set -euo pipefail
 
 DEPLOY_DIR=${DEPLOY_DIR:-/opt/c-nav}
@@ -101,23 +101,21 @@ say "登录腾讯云镜像仓库"
 echo "用户名 ${TCR_USER}，密码 = TCR 控制台『个人版实例 → 初始化密码/重置密码』设置的那个"
 docker login "$REGISTRY" --username "$TCR_USER"
 
-say "为 GitHub Actions 生成部署密钥"
-if [ ! -f /root/.ssh/c-nav-deploy ]; then
-  mkdir -p /root/.ssh
-  ssh-keygen -t ed25519 -N '' -C 'github-actions-c-nav' -f /root/.ssh/c-nav-deploy >/dev/null
-  cat /root/.ssh/c-nav-deploy.pub >> /root/.ssh/authorized_keys
-  chmod 600 /root/.ssh/authorized_keys
-  echo "公钥已追加到 /root/.ssh/authorized_keys"
+say "安装部署脚本 deploy.sh"
+if [ -f "$(dirname "$0")/deploy.sh" ]; then
+  install -m 755 "$(dirname "$0")/deploy.sh" "${DEPLOY_DIR}/deploy.sh"
+  echo "已安装 ${DEPLOY_DIR}/deploy.sh"
+elif [ -f "${DEPLOY_DIR}/deploy.sh" ]; then
+  echo "已存在 ${DEPLOY_DIR}/deploy.sh"
 else
-  echo "密钥已存在，复用 /root/.ssh/c-nav-deploy"
+  echo "未找到 deploy.sh，可稍后从仓库 deploy/deploy.sh 复制到 ${DEPLOY_DIR}/"
 fi
 
 echo "-----------------------------------------------------"
-echo " 把下面整段【私钥】（含 BEGIN/END 行）复制到 GitHub Secret: SSH_KEY"
-echo "-----------------------------------------------------"
-cat /root/.ssh/c-nav-deploy
-echo "-----------------------------------------------------"
-echo " 确认 GitHub 上的 SSH_KEY 已填好后，可执行：shred -u /root/.ssh/c-nav-deploy"
+echo " 以后部署有两种方式（二选一，都在服务器本机执行）："
+echo "   1) 1Panel → 计划任务 → Shell 脚本，内容：bash ${DEPLOY_DIR}/deploy.sh"
+echo "      创建后点『执行』按钮即可上线，不需要从外网 SSH 进来"
+echo "   2) 命令行：cd ${DEPLOY_DIR} && docker compose pull && docker compose up -d"
 echo "-----------------------------------------------------"
 
 say "拉取镜像并启动（TCR 里还没有镜像时这一步会失败，属正常）"
