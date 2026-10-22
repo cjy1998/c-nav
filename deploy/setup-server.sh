@@ -102,11 +102,26 @@ echo "用户名 ${TCR_USER}，密码 = TCR 控制台『个人版实例 → 初�
 docker login "$REGISTRY" --username "$TCR_USER"
 
 say "安装部署脚本 deploy.sh"
+fetch_file() { # $1=文件名 $2=目标路径
+  for url in \
+    "https://cdn.jsdelivr.net/gh/cjy1998/c-nav@main/deploy/$1" \
+    "https://raw.githubusercontent.com/cjy1998/c-nav/main/deploy/$1"; do
+    if curl -fsSL --max-time 30 "$url" -o "$2"; then
+      echo "已从 $url 下载"
+      return 0
+    fi
+  done
+  return 1
+}
+
 if [ -f "$(dirname "$0")/deploy.sh" ]; then
   install -m 755 "$(dirname "$0")/deploy.sh" "${DEPLOY_DIR}/deploy.sh"
   echo "已安装 ${DEPLOY_DIR}/deploy.sh"
 elif [ -f "${DEPLOY_DIR}/deploy.sh" ]; then
   echo "已存在 ${DEPLOY_DIR}/deploy.sh"
+elif fetch_file deploy.sh "${DEPLOY_DIR}/deploy.sh"; then
+  chmod 755 "${DEPLOY_DIR}/deploy.sh"
+  echo "已安装 ${DEPLOY_DIR}/deploy.sh"
 else
   echo "未找到 deploy.sh，可稍后从仓库 deploy/deploy.sh 复制到 ${DEPLOY_DIR}/"
 fi

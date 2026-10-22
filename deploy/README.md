@@ -41,9 +41,20 @@ GitHub repo ──(打 tag v*)──> Actions: docker build (linux/amd64)
 1Panel → 主机 → 终端（或 SSH 登录），以 root 执行：
 
 ```bash
-# 把仓库里的 deploy/setup-server.sh 传上去后
-bash setup-server.sh
+curl -fsSL https://cdn.jsdelivr.net/gh/cjy1998/c-nav@main/deploy/setup-server.sh -o /tmp/setup-server.sh \
+  && bash /tmp/setup-server.sh
 ```
+
+（jsDelivr 不通就换 GitHub 原始地址：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/cjy1998/c-nav/main/deploy/setup-server.sh -o /tmp/setup-server.sh \
+  && bash /tmp/setup-server.sh
+```
+
+)
+
+脚本可重复执行：`docker-compose.yml`、`.env`、`deploy.sh` 已存在时会跳过，不会覆盖管理员密码。
 
 它会：建 `/opt/c-nav`、写 `docker-compose.yml` 和 `.env`（生成 20 位管理员密码并打印）、安装 `deploy.sh`、`docker login` 腾讯云 TCR、最后尝试拉取并启动。
 
